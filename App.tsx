@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MarketHeader from './components/MarketHeader';
 import StockSearch from './components/StockSearch';
 import AnalysisDisplay from './components/AnalysisDisplay';
@@ -15,15 +15,12 @@ import { AnalysisResult } from './types';
 // Link quảng cáo CPM
 const AD_LINK = "https://www.effectivegatecpm.com/k6dp34zi?key=2b1380ad9c8a0bdd9cd91eaae5adee7c";
 
-// Declare aistudio types for window
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
-
   interface Window {
-    // Fixed: Added '?' to make the declaration optional, resolving conflicts with ambient declarations that use different modifiers.
     aistudio?: AIStudio;
   }
 }
@@ -39,28 +36,40 @@ const App: React.FC = () => {
   const [portfolioRefresh, setPortfolioRefresh] = useState(0);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
-  // Logic mở quảng cáo khi click vào link
+  // Logic mở quảng cáo an toàn hơn
+  const openAd = useCallback(() => {
+    try {
+      const adWindow = window.open(AD_LINK, '_blank', 'noopener,noreferrer');
+      if (adWindow) adWindow.opener = null;
+    } catch (e) {
+      console.warn("Pop-up blocked by browser");
+    }
+  }, []);
+
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // Tìm xem phần tử được click có phải là link hoặc nằm trong link không
       const anchor = target.closest('a');
       
-      if (anchor) {
-        // Mở link quảng cáo trong tab mới
-        window.open(AD_LINK, '_blank');
+      if (anchor && anchor.href !== '#' && !anchor.href.includes(window.location.hostname)) {
+        // Chỉ mở quảng cáo khi người dùng click vào các link dẫn ra ngoài
+        openAd();
       }
     };
 
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
-  }, []);
+  }, [openAd]);
 
   useEffect(() => {
     const checkApiKey = async () => {
       if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
+        try {
+          const selected = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(selected);
+        } catch (e) {
+          console.error("AI Studio Check Error", e);
+        }
       }
     };
     checkApiKey();
@@ -69,7 +78,6 @@ const App: React.FC = () => {
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      // Mitigate race condition by assuming success immediately after triggering selection
       setHasApiKey(true); 
     }
   };
@@ -84,6 +92,7 @@ const App: React.FC = () => {
       setAnalysis(result);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
+      console.error("Analysis Error:", err);
       if (err.message?.includes("entity was not found")) {
         setError('Lỗi API Key: Vui lòng cấu hình lại API Key từ Google AI Studio của bạn.');
         setHasApiKey(false);
@@ -174,7 +183,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-20">
-      {/* Navigation */}
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={resetHome}>
@@ -186,39 +194,19 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-4 md:gap-8">
             <div className="hidden md:flex gap-6 text-slate-400 font-medium">
-              <button 
-                onClick={() => { setCurrentView('Home'); setTicker(null); }} 
-                className={currentView === 'Home' ? "text-white" : "hover:text-blue-400 transition-colors"}
-              >
-                Trang chủ
-              </button>
-              <button 
-                onClick={() => { setCurrentView('Market'); setTicker(null); }} 
-                className={currentView === 'Market' ? "text-white" : "hover:text-blue-400 transition-colors"}
-              >
-                Thị trường
-              </button>
-              <button 
-                onClick={() => { setCurrentView('Community'); setTicker(null); }} 
-                className={currentView === 'Community' ? "text-white" : "hover:text-blue-400 transition-colors"}
-              >
-                Cộng đồng
-              </button>
+              <button onClick={() => { setCurrentView('Home'); setTicker(null); }} className={currentView === 'Home' ? "text-white" : "hover:text-blue-400 transition-colors"}>Trang chủ</button>
+              <button onClick={() => { setCurrentView('Market'); setTicker(null); }} className={currentView === 'Market' ? "text-white" : "hover:text-blue-400 transition-colors"}>Thị trường</button>
+              <button onClick={() => { setCurrentView('Community'); setTicker(null); }} className={currentView === 'Community' ? "text-white" : "hover:text-blue-400 transition-colors"}>Cộng đồng</button>
             </div>
 
             <div className="flex items-center gap-2">
               {!hasApiKey ? (
-                <button 
-                  onClick={handleOpenKeySelector}
-                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold px-3 py-2 rounded-lg transition-all animate-pulse"
-                >
-                  <i className="fa-solid fa-key"></i>
-                  Thiết lập API Key
+                <button onClick={handleOpenKeySelector} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold px-3 py-2 rounded-lg transition-all animate-pulse">
+                  <i className="fa-solid fa-key"></i> Thiết lập API Key
                 </button>
               ) : (
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 text-[10px] font-bold">
-                  <i className="fa-solid fa-circle-check"></i>
-                  API Connected
+                  <i className="fa-solid fa-circle-check"></i> API Connected
                 </div>
               )}
             </div>
@@ -228,42 +216,27 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 mt-8">
         <MarketHeader />
-        
         {currentView === 'Home' && !ticker && !loading && (
           <div className="mt-12 text-center mb-10">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
-              Phân Tích Cổ Phiếu Thông Minh
-            </h1>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              Sử dụng khóa API cá nhân của bạn để truy cập sức mạnh AI tối đa từ Google Gemini.
-            </p>
+            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">Phân Tích Cổ Phiếu Thông Minh</h1>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">Sử dụng sức mạnh AI Gemini để phân tích kỹ thuật và cơ bản các mã cổ phiếu tại VN.</p>
           </div>
         )}
-
         {currentView === 'Home' && <StockSearch onSearch={handleSearch} />}
-
         {error && (
           <div className="bg-rose-500/10 border border-rose-500/20 p-6 rounded-2xl text-rose-400 text-center mb-8 max-w-2xl mx-auto">
             <i className="fa-solid fa-circle-exclamation text-2xl mb-2"></i>
             <p className="font-medium">{error}</p>
-            {!hasApiKey && (
-              <button 
-                onClick={handleOpenKeySelector}
-                className="mt-4 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-bold hover:bg-rose-400 transition-colors"
-              >
-                Chọn API Key mới
-              </button>
-            )}
+            {!hasApiKey && <button onClick={handleOpenKeySelector} className="mt-4 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-bold hover:bg-rose-400 transition-colors">Chọn API Key mới</button>}
           </div>
         )}
-
         {renderContent()}
       </main>
 
       <footer className="mt-20 border-t border-slate-800 py-10 text-center text-slate-500 text-sm">
         <p>© 2024 VN Stock Insight. Powered by your Google Gemini API Key.</p>
         <div className="flex justify-center gap-4 mt-2">
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="hover:text-blue-400 underline decoration-blue-500/30">Tài liệu thanh toán & Free Tier</a>
+          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 underline decoration-blue-500/30">Tài liệu thanh toán & Free Tier</a>
         </div>
       </footer>
     </div>

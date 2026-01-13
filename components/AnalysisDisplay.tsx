@@ -60,7 +60,7 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
     }
   };
 
-  const ratios = result.financialRatios;
+  const ratios = result?.financialRatios || {};
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -109,7 +109,7 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
             <h3 className="text-xl font-bold text-blue-400 mb-3 flex items-center gap-2">
               <i className="fa-solid fa-file-lines"></i> Tóm tắt định hướng
             </h3>
-            <p className="text-slate-300 leading-relaxed text-base">{result.summary}</p>
+            <p className="text-slate-300 leading-relaxed text-base">{result.summary || "Đang cập nhật tóm tắt..."}</p>
           </section>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -117,13 +117,13 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
               <h3 className="text-xl font-bold text-emerald-400 mb-4 flex items-center gap-2 border-b border-emerald-500/20 pb-2">
                 <i className="fa-solid fa-chart-line"></i> Phân tích kỹ thuật
               </h3>
-              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-sm">{result.technicalAnalysis}</p>
+              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-sm">{result.technicalAnalysis || "Dữ liệu phân tích kỹ thuật đang được tải..."}</p>
             </section>
             <section>
               <h3 className="text-xl font-bold text-indigo-400 mb-4 flex items-center gap-2 border-b border-indigo-500/20 pb-2">
                 <i className="fa-solid fa-building-columns"></i> Phân tích cơ bản
               </h3>
-              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-sm">{result.fundamentalAnalysis}</p>
+              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-sm">{result.fundamentalAnalysis || "Dữ liệu phân tích cơ bản đang được tải..."}</p>
             </section>
           </div>
 
@@ -134,12 +134,12 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
             <h3 className="text-xl font-bold text-rose-400 mb-3 flex items-center gap-2">
               <i className="fa-solid fa-triangle-exclamation"></i> Rủi ro & Cảnh báo
             </h3>
-            <p className="text-slate-300 leading-relaxed text-sm relative z-10">{result.risks}</p>
+            <p className="text-slate-300 leading-relaxed text-sm relative z-10">{result.risks || "Không có cảnh báo rủi ro đặc biệt."}</p>
           </section>
         </div>
       </div>
 
-      {result.sources.length > 0 && (
+      {result.sources && result.sources.length > 0 && (
         <div className="glass p-6 rounded-2xl">
           <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest flex items-center gap-2">
             <i className="fa-solid fa-satellite-dish text-blue-400"></i> Nguồn tham khảo tin tức
