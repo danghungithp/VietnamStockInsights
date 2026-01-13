@@ -12,17 +12,19 @@ import CommunityView from './components/CommunityView';
 import { getAIAnalysis } from './services/geminiService';
 import { AnalysisResult } from './types';
 
+// Link quảng cáo CPM
+const AD_LINK = "https://www.effectivegatecpm.com/k6dp34zi?key=2b1380ad9c8a0bdd9cd91eaae5adee7c";
+
 // Declare aistudio types for window
 declare global {
-  // Fix: Defining the AIStudio interface explicitly to resolve naming and modifier conflicts
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
 
   interface Window {
-    // Fix: Using the named AIStudio interface as required by existing global declarations
-    aistudio: AIStudio;
+    // Fixed: Added '?' to make the declaration optional, resolving conflicts with ambient declarations that use different modifiers.
+    aistudio?: AIStudio;
   }
 }
 
@@ -37,6 +39,23 @@ const App: React.FC = () => {
   const [portfolioRefresh, setPortfolioRefresh] = useState(0);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
+  // Logic mở quảng cáo khi click vào link
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Tìm xem phần tử được click có phải là link hoặc nằm trong link không
+      const anchor = target.closest('a');
+      
+      if (anchor) {
+        // Mở link quảng cáo trong tab mới
+        window.open(AD_LINK, '_blank');
+      }
+    };
+
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
   useEffect(() => {
     const checkApiKey = async () => {
       if (window.aistudio) {
@@ -50,7 +69,8 @@ const App: React.FC = () => {
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setHasApiKey(true); // Assume success per guidelines
+      // Mitigate race condition by assuming success immediately after triggering selection
+      setHasApiKey(true); 
     }
   };
 
