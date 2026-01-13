@@ -90,11 +90,10 @@ const SignalShape = (props: any) => {
 
   return (
     <g>
-      {payload.signalType === 'BUY' ? (
-        <path d={`M${cx},${cy - 10} L${cx - 8},${cy + 5} L${cx + 8},${cy + 5} Z`} fill={fill} stroke="#fff" strokeWidth={1} />
-      ) : (
-        <path d={`M${cx},${cy + 10} L${cx - 8},${cy - 5} L${cx + 8},${cy - 5} Z`} fill={fill} stroke="#fff" strokeWidth={1} />
-      )}
+      <circle cx={cx} cy={cy} r={12} fill={fill} fillOpacity={0.2} stroke={fill} strokeWidth={1} />
+      <text x={cx} y={cy + 4} textAnchor="middle" fill={fill} fontSize="10" fontWeight="bold">
+        {payload.signalLabel}
+      </text>
     </g>
   );
 };
@@ -109,8 +108,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
   const [showRSI, setShowRSI] = useState(true);
   const [showSignals, setShowSignals] = useState(true);
   const [volumeType, setVolumeType] = useState<'bar' | 'area'>('bar');
-  const [smaPeriod, setSmaPeriod] = useState(20);
-  const [emaPeriod, setEmaPeriod] = useState(10);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -134,8 +132,8 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
 
   const processedData = useMemo(() => {
     if (rawData.length === 0) return [];
-    const sma = calculateSMA(rawData, smaPeriod);
-    const ema = calculateEMA(rawData, emaPeriod);
+    const sma = calculateSMA(rawData, 20);
+    const ema = calculateEMA(rawData, 10);
     const rsi = calculateRSI(rawData, 14);
 
     let lastSignalType: 'BUY' | 'SELL' | null = null;
@@ -152,7 +150,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
           buySell = 'SELL';
           lastSignalType = 'SELL';
         } else if (currentRSI >= 30 && currentRSI <= 70) {
-          lastSignalType = null;
+          // Keep the status to avoid multiple signals in the same zone
         }
       }
 
@@ -166,122 +164,108 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         signalLabel: buySell === 'BUY' ? 'M' : buySell === 'SELL' ? 'B' : null
       };
     });
-  }, [rawData, smaPeriod, emaPeriod, showSignals]);
+  }, [rawData, showSignals]);
+
+  const latestSignals = useMemo(() => {
+    return [...processedData]
+      .filter(d => d.signalType)
+      .reverse()
+      .slice(0, 3);
+  }, [processedData]);
 
   const formatVolume = (value: number) => {
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     return `${(value / 1000).toFixed(0)}K`;
   };
 
-  if (loading) {
-    return (
-      <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-slate-500 text-sm">Đang tải dữ liệu từ Yahoo Finance...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || processedData.length === 0) {
-    return (
-      <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center text-slate-500 italic text-center">
-        <div>
-          <i className="fa-solid fa-triangle-exclamation text-3xl mb-4 text-amber-500"></i>
-          <p>Không thể tìm thấy dữ liệu giá thực tế cho mã {ticker} trên Yahoo Finance.</p>
-          <p className="text-xs mt-2">Gợi ý: Yahoo Finance hỗ trợ tốt các mã lớn (HPG.VN, SSI.VN...)</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center animate-pulse"><span className="text-slate-500">Đang tải biểu đồ kỹ thuật...</span></div>;
 
   return (
     <div className="space-y-4">
-      <div className="glass p-6 rounded-2xl flex flex-col">
+      <div className="glass p-6 rounded-2xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-            <i className="fa-solid fa-chart-line text-blue-500"></i>
-            Dữ liệu Yahoo Finance ({ticker})
-          </h3>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <i className="fa-solid fa-chart-area text-blue-500"></i>
+              Biểu đồ kĩ thuật {ticker}
+            </h3>
+            <button 
+              onClick={() => setShowGuide(!showGuide)}
+              className="text-[10px] text-blue-400 font-bold hover:underline mt-1"
+            >
+              <i className="fa-solid fa-circle-info mr-1"></i> Cách đọc tín hiệu?
+            </button>
+          </div>
           
           <div className="flex flex-wrap gap-2">
-            <button 
-              onClick={() => setShowSMA(!showSMA)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${showSMA ? 'bg-orange-500/20 border-orange-500 text-orange-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
-            >
-              SMA {smaPeriod}
-            </button>
-            <button 
-              onClick={() => setShowEMA(!showEMA)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${showEMA ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
-            >
-              EMA {emaPeriod}
-            </button>
-            <button 
-              onClick={() => setShowRSI(!showRSI)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${showRSI ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
-            >
-              RSI
-            </button>
-            <button 
-              onClick={() => setShowSignals(!showSignals)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${showSignals ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
-            >
-              M/B
-            </button>
+            {['SMA', 'EMA', 'RSI', 'M/B'].map((label) => {
+              const isActive = label === 'SMA' ? showSMA : label === 'EMA' ? showEMA : label === 'RSI' ? showRSI : showSignals;
+              const setFunc = label === 'SMA' ? setShowSMA : label === 'EMA' ? setShowEMA : label === 'RSI' ? setShowRSI : setShowSignals;
+              return (
+                <button 
+                  key={label}
+                  onClick={() => setFunc(!isActive)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${isActive ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
             <button 
               onClick={() => setVolumeType(volumeType === 'bar' ? 'area' : 'bar')}
-              title={`Chuyển sang biểu đồ ${volumeType === 'bar' ? 'Vùng' : 'Cột'}`}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all border border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20`}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
             >
-              <i className={`fa-solid ${volumeType === 'bar' ? 'fa-chart-simple' : 'fa-chart-area'} mr-1`}></i>
-              {volumeType === 'bar' ? 'Cột' : 'Vùng'}
+              <i className={`fa-solid ${volumeType === 'bar' ? 'fa-chart-simple' : 'fa-chart-area'}`}></i>
             </button>
           </div>
         </div>
 
-        <div className="h-[400px] w-full">
+        {showGuide && (
+          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-slate-300 leading-relaxed animate-in fade-in slide-in-from-top-2">
+            <p className="mb-2 font-bold text-blue-400 uppercase tracking-wider">Chiến lược sử dụng:</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong className="text-emerald-400">Tín hiệu M (Mua):</strong> RSI giảm xuống dưới 30 (Vùng quá bán), kỳ vọng giá phục hồi.</li>
+              <li><strong className="text-rose-400">Tín hiệu B (Bán):</strong> RSI vượt lên trên 70 (Vùng quá mua), cảnh báo giá sắp điều chỉnh.</li>
+              <li><strong className="text-orange-400">SMA/EMA:</strong> Sử dụng làm đường hỗ trợ/kháng cự động. Giá vượt lên trên là xu hướng tăng.</li>
+            </ul>
+          </div>
+        )}
+
+        <div className="h-[350px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={processedData} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+            <ComposedChart data={processedData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
-                <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#475569" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#475569" stopOpacity={0}/>
-                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} minTickGap={40} />
+              <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
               <YAxis yAxisId="price" stroke="#3b82f6" fontSize={10} tickLine={false} axisLine={false} domain={['auto', 'auto']} tickFormatter={(val) => val.toLocaleString('vi-VN')} />
-              <YAxis yAxisId="volume" orientation="right" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} domain={[0, (max: number) => max * 4]} tickFormatter={formatVolume} />
+              <YAxis yAxisId="volume" orientation="right" hide />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px' }}
-                itemStyle={{ fontSize: '12px' }}
-                formatter={(val: any, name: string) => [val.toLocaleString('vi-VN'), name]}
+                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', fontSize: '11px' }}
+                formatter={(val: any) => val.toLocaleString('vi-VN')}
               />
-              <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.05em', color: '#94a3b8' }} />
+              <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
               
               {volumeType === 'bar' ? (
-                <Bar yAxisId="volume" dataKey="volume" fill="#1e293b" opacity={0.4} barSize={12} name="Khối lượng (Cột)" />
+                <Bar yAxisId="volume" dataKey="volume" fill="#1e293b" opacity={0.3} name="Khối lượng" />
               ) : (
-                <Area yAxisId="volume" type="monotone" dataKey="volume" stroke="#1e293b" fill="url(#colorVolume)" strokeWidth={1} name="Khối lượng (Vùng)" dot={false} />
+                <Area yAxisId="volume" type="monotone" dataKey="volume" fill="#1e293b" stroke="none" opacity={0.2} name="Khối lượng" />
               )}
 
-              <Area yAxisId="price" type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#colorPrice)" strokeWidth={2} dot={false} name="Giá đóng cửa" />
+              <Area yAxisId="price" type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#colorPrice)" strokeWidth={2} dot={false} name="Giá" />
               
-              {showSMA && <Line yAxisId="price" type="monotone" dataKey="sma" stroke="#f59e0b" strokeWidth={1.5} dot={false} name={`SMA ${smaPeriod}`} />}
-              {showEMA && <Line yAxisId="price" type="monotone" dataKey="ema" stroke="#a855f7" strokeWidth={1.5} dot={false} name={`EMA ${emaPeriod}`} />}
+              {showSMA && <Line yAxisId="price" type="monotone" dataKey="sma" stroke="#f59e0b" strokeWidth={1} dot={false} name="SMA 20" />}
+              {showEMA && <Line yAxisId="price" type="monotone" dataKey="ema" stroke="#a855f7" strokeWidth={1} dot={false} name="EMA 10" />}
               
               {showSignals && (
                 <Scatter yAxisId="price" dataKey="signal" shape={<SignalShape />} name="Tín hiệu M/B">
                   {processedData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.signalType === 'BUY' ? '#10b981' : '#f43f5e'} />
                   ))}
-                  <LabelList dataKey="signalLabel" position="top" offset={15} style={{ fontSize: '10px', fontWeight: 'bold', fill: '#fff' }} />
                 </Scatter>
               )}
             </ComposedChart>
@@ -289,23 +273,42 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         </div>
 
         {showRSI && (
-          <div className="mt-6 border-t border-slate-800 pt-6 h-[150px]">
-            <div className="flex justify-between items-center mb-2 px-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Chỉ số RSI (14)</span>
-              <span className="text-[10px] font-bold text-cyan-400">{processedData[processedData.length-1]?.rsi}</span>
-            </div>
+          <div className="mt-4 h-[100px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={processedData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="date" hide />
                 <YAxis domain={[0, 100]} ticks={[30, 70]} stroke="#475569" fontSize={9} tickLine={false} axisLine={false} />
-                <Line type="monotone" dataKey="rsi" stroke="#06b6d4" strokeWidth={1.5} dot={false} isAnimationActive={false} name="RSI" />
-                <Line dataKey={() => 70} stroke="#f43f5e" strokeDasharray="3 3" dot={false} strokeWidth={1} opacity={0.3} />
-                <Line dataKey={() => 30} stroke="#10b981" strokeDasharray="3 3" dot={false} strokeWidth={1} opacity={0.3} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <Line type="monotone" dataKey="rsi" stroke="#06b6d4" strokeWidth={1} dot={false} name="RSI" />
+                <Line dataKey={() => 70} stroke="#f43f5e" strokeDasharray="5 5" dot={false} opacity={0.3} />
+                <Line dataKey={() => 30} stroke="#10b981" strokeDasharray="5 5" dot={false} opacity={0.3} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}
+
+        {/* Tín hiệu gần nhất */}
+        <div className="mt-6 pt-6 border-t border-slate-800">
+          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Tín hiệu kỹ thuật gần đây</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {latestSignals.length > 0 ? latestSignals.map((sig, i) => (
+              <div key={i} className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                <div>
+                  <div className={`text-xs font-black ${sig.signalType === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {sig.signalType === 'BUY' ? 'MUA (RSI < 30)' : 'BÁN (RSI > 70)'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium">{sig.date}</div>
+                </div>
+                <div className="text-xs font-bold text-white">
+                  {sig.price.toLocaleString('vi-VN')}
+                </div>
+              </div>
+            )) : (
+              <div className="col-span-3 text-center py-4 text-xs text-slate-600 italic">
+                Chưa phát hiện tín hiệu mua bán rõ rệt trong giai đoạn này.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

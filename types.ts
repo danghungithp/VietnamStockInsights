@@ -72,3 +72,19 @@ export interface PortfolioStock {
   change: number;
   changePercent: number;
 }
+
+export interface MarketMover {
+  ticker: string;
+  price: number;
+  changePercent: number;
+  volume: string;
+}
+
+export interface SocialTrend {
+  ticker: string;
+  sentimentScore: number; // 0 to 100
+  mentionCount: string;
+  platforms: string[]; // ['Facebook', 'Zalo', 'TikTok', 'F319']
+  status: 'Hot' | 'Rising' | 'Alert';
+  reason: string;
+}

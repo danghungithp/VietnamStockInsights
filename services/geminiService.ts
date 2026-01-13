@@ -1,14 +1,13 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisResult, GroundingLink, NewsItem, MarketIndex } from "../types";
+import { AnalysisResult, GroundingLink, NewsItem, MarketIndex, MarketMover, SocialTrend } from "../types";
 
-const API_KEY = process.env.API_KEY || "";
+// Hàm khởi tạo AI instance với khóa mới nhất từ process.env.API_KEY
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getMarketOverview = async (): Promise<MarketIndex[]> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-  const prompt = `Lấy giá trị hiện tại, điểm thay đổi và % thay đổi của các chỉ số chứng khoán Việt Nam sau: VN-INDEX, HNX-INDEX, UPCOM-INDEX, VN30. 
-  Hãy tìm thông tin thực tế mới nhất từ Yahoo Finance hoặc CafeF.
-  Trả về định dạng JSON array: [{"name": string, "value": number, "change": number, "changePercent": number}]`;
+  const ai = getAI();
+  const prompt = `Lấy giá trị hiện tại, điểm thay đổi và % thay đổi của các chỉ số chứng khoán Việt Nam sau: VN-INDEX, HNX-INDEX, UPCOM-INDEX, VN30. Trả về JSON array.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -39,22 +38,79 @@ export const getMarketOverview = async (): Promise<MarketIndex[]> => {
   }
 };
 
-export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
-  const prompt = `Hãy phân tích mã cổ phiếu ${ticker} trên thị trường chứng khoán Việt Nam. 
-  Sử dụng dữ liệu từ Yahoo Finance và các nguồn tin tức tài chính uy tín (CafeF, Vietstock).
-  Cập nhật thông tin mới nhất về kết quả kinh doanh quý gần nhất, tin tức sự kiện quan trọng, nhận định kỹ thuật và các rủi ro hiện hữu.
-  
-  Đồng thời, hãy tìm ít nhất 5 tin tức mới nhất liên quan đến mã ${ticker}.
-  
-  YÊU CẦU ĐẶC BIỆT: Đưa ra một dự báo giá mục tiêu trong vòng 3-6 tháng tới.
-  
-  Trả về kết quả theo định dạng JSON chuyên nghiệp.`;
+export const getMarketMovers = async (): Promise<{ gainers: MarketMover[], losers: MarketMover[], active: MarketMover[] }> => {
+  const ai = getAI();
+  const prompt = `Tìm danh sách các cổ phiếu biến động mạnh nhất hôm nay tại VN: top tăng giá, top giảm giá và top giao dịch nhiều nhất. Trả về JSON object { gainers: [], losers: [], active: [] }.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            gainers: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
+            losers: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
+            active: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"gainers":[],"losers":[],"active":[]}');
+  } catch (error: any) {
+    if (error.message?.includes("Requested entity was not found")) {
+      console.warn("API Key might be invalid or project not found.");
+    }
+    return { gainers: [], losers: [], active: [] };
+  }
+};
+
+export const getSocialTrends = async (): Promise<SocialTrend[]> => {
+  const ai = getAI();
+  const prompt = `Phân tích các hội nhóm Facebook chứng khoán, Zalo, TikTok và diễn đàn F319 để tìm ra 5 mã cổ phiếu đang được cộng đồng quan tâm nhất hiện nay tại Việt Nam. 
+  Đánh giá điểm tâm lý (0-100), số lượng nhắc tới và lý do tại sao nó đang "hot". 
+  Trả về JSON array.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              ticker: { type: Type.STRING },
+              sentimentScore: { type: Type.NUMBER },
+              mentionCount: { type: Type.STRING },
+              platforms: { type: Type.ARRAY, items: { type: Type.STRING } },
+              status: { type: Type.STRING, enum: ['Hot', 'Rising', 'Alert'] },
+              reason: { type: Type.STRING }
+            },
+            required: ["ticker", "sentimentScore", "mentionCount", "platforms", "status", "reason"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (error) {
+    return [];
+  }
+};
+
+export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => {
+  const ai = getAI();
+  const prompt = `Hãy phân tích mã cổ phiếu ${ticker} trên thị trường chứng khoán Việt Nam. Trả về kết quả JSON.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview", // Use Pro for deep analysis
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -86,8 +142,7 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
                 timeframe: { type: Type.STRING },
                 confidence: { type: Type.STRING, enum: ['LOW', 'MEDIUM', 'HIGH'] },
                 reasoning: { type: Type.STRING }
-              },
-              required: ["targetPrice", "currentPrice", "timeframe", "confidence", "reasoning"]
+              }
             },
             news: {
               type: Type.ARRAY,
@@ -99,12 +154,10 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
                   url: { type: Type.STRING },
                   time: { type: Type.STRING },
                   category: { type: Type.STRING, enum: ['Kết quả kinh doanh', 'Cổ tức', 'Vĩ mô', 'Giao dịch', 'Tin chung'] }
-                },
-                required: ["title", "source", "url", "time", "category"]
+                }
               }
             }
-          },
-          required: ["summary", "technicalAnalysis", "fundamentalAnalysis", "risks", "recommendation", "financialRatios", "priceForecast", "news"]
+          }
         }
       },
     });
@@ -120,13 +173,12 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
 
     return { ...result, sources };
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
     throw error;
   }
 };
 
 export const searchStockNews = async (ticker: string, query: string): Promise<NewsItem[]> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = getAI();
   const prompt = `Tìm tin tức về mã ${ticker} liên quan đến: "${query}". Trả về JSON array.`;
   try {
     const response = await ai.models.generateContent({
@@ -135,19 +187,6 @@ export const searchStockNews = async (ticker: string, query: string): Promise<Ne
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              source: { type: Type.STRING },
-              url: { type: Type.STRING },
-              time: { type: Type.STRING },
-              category: { type: Type.STRING, enum: ['Kết quả kinh doanh', 'Cổ tức', 'Vĩ mô', 'Giao dịch', 'Tin chung'] }
-            }
-          }
-        }
       },
     });
     return JSON.parse(response.text || "[]");
