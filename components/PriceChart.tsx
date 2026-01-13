@@ -105,9 +105,6 @@ const Candlestick = (props: any) => {
   const isUp = close >= open;
   const color = isUp ? '#10b981' : '#f43f5e';
 
-  // The bar represents the body (open/close)
-  // Recharts provides x, y, width, height for the bar based on the [open, close] array
-  // We need to calculate the ratio to place the whiskers (high/low)
   const ratio = Math.abs(open - close) === 0 ? 1 : height / Math.abs(open - close);
   const highY = y - Math.abs(high - Math.max(open, close)) * ratio;
   const lowY = y + height + Math.abs(Math.min(open, close) - low) * ratio;
@@ -115,7 +112,6 @@ const Candlestick = (props: any) => {
 
   return (
     <g>
-      {/* Wick (High-Low Line) */}
       <line 
         x1={centerX} 
         y1={highY} 
@@ -124,7 +120,6 @@ const Candlestick = (props: any) => {
         stroke={color} 
         strokeWidth={1.5} 
       />
-      {/* Body (Open-Close Rect) */}
       <rect 
         x={x} 
         y={y} 
@@ -139,7 +134,7 @@ const Candlestick = (props: any) => {
 const PriceChart: React.FC<Props> = ({ ticker }) => {
   const [rawData, setRawData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [showSMA, setShowSMA] = useState(true);
   const [showEMA, setShowEMA] = useState(false);
@@ -150,16 +145,16 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setError(false);
+      setError(null);
       try {
         const data = await getYahooHistoricalData(ticker);
-        if (data.length > 0) {
+        if (data && data.length > 0) {
           setRawData(data);
         } else {
-          setError(true);
+          setError("Không thể lấy dữ liệu lịch sử từ Yahoo Finance. Có thể mã cổ phiếu không tồn tại hoặc dịch vụ đang bảo trì.");
         }
       } catch (err) {
-        setError(true);
+        setError("Lỗi kết nối máy chủ dữ liệu.");
       } finally {
         setLoading(false);
       }
@@ -197,7 +192,6 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         signal: buySell ? d.close : null,
         signalType: buySell,
         signalLabel: buySell === 'BUY' ? 'M' : buySell === 'SELL' ? 'B' : null,
-        // Range for the Bar body
         candle: [d.open, d.close]
       };
     });
@@ -210,9 +204,25 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
       .slice(0, 3);
   }, [processedData]);
 
-  if (loading) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center animate-pulse"><span className="text-slate-500">Đang tải biểu đồ kỹ thuật...</span></div>;
+  if (loading) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center animate-pulse"><span className="text-slate-500 text-sm">Đang tải biểu đồ kỹ thuật cho {ticker}...</span></div>;
 
-  if (error) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center"><span className="text-rose-400">Không thể tải dữ liệu biểu đồ.</span></div>;
+  if (error) return (
+    <div className="glass p-8 rounded-2xl h-[450px] flex flex-col items-center justify-center text-center space-y-4 border-rose-500/20">
+      <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500">
+        <i className="fa-solid fa-circle-exclamation text-3xl"></i>
+      </div>
+      <div className="max-w-md">
+        <h4 className="text-rose-400 font-bold mb-2">Lỗi tải dữ liệu</h4>
+        <p className="text-slate-400 text-sm">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-6 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+        >
+          <i className="fa-solid fa-rotate-right mr-2"></i> Thử lại
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -287,7 +297,6 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
               
               <Bar yAxisId="volume" dataKey="volume" fill="#1e293b" opacity={0.2} name="Khối lượng" />
 
-              {/* Candlestick Body and Wicks */}
               <Bar 
                 yAxisId="price" 
                 dataKey="candle" 

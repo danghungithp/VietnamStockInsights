@@ -1,7 +1,8 @@
 
 import { ChartDataPoint, PortfolioStock } from "../types";
 
-const CORS_PROXY = "https://corsproxy.io/?";
+// Sử dụng AllOrigins để có độ ổn định cao hơn khi deploy lên Vercel
+const CORS_PROXY = "https://api.allorigins.win/raw?url=";
 
 export const getYahooHistoricalData = async (ticker: string, range: string = "3mo"): Promise<ChartDataPoint[]> => {
   const symbol = ticker.includes('.') ? ticker : `${ticker}.VN`;
@@ -9,24 +10,35 @@ export const getYahooHistoricalData = async (ticker: string, range: string = "3m
 
   try {
     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`);
-    if (!response.ok) throw new Error("Không thể lấy dữ liệu từ Yahoo Finance");
+    if (!response.ok) throw new Error("Proxy error");
     
     const json = await response.json();
+    
+    if (!json.chart || !json.chart.result) {
+      console.error("Yahoo API Error:", json);
+      return [];
+    }
+
     const result = json.chart.result[0];
     const timestamps = result.timestamp;
+    if (!timestamps) return [];
+
     const quotes = result.indicators.quote[0];
+    const adjClose = result.indicators.adjclose?.[0]?.adjclose || quotes.close;
     
-    const { open, high, low, close: prices, volume: volumes } = quotes;
+    const { open, high, low, volume: volumes } = quotes;
 
     return timestamps.map((ts: number, i: number) => {
       const date = new Date(ts * 1000);
+      const closePrice = adjClose[i] || quotes.close[i];
+      
       return {
         date: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-        price: Math.round(prices[i]),
-        open: Math.round(open[i]),
-        high: Math.round(high[i]),
-        low: Math.round(low[i]),
-        close: Math.round(prices[i]),
+        price: Math.round(closePrice),
+        open: Math.round(open[i] || closePrice),
+        high: Math.round(high[i] || closePrice),
+        low: Math.round(low[i] || closePrice),
+        close: Math.round(closePrice),
         volume: volumes[i] || 0
       };
     }).filter((item: any) => item.price !== null && item.open !== null);
@@ -43,6 +55,9 @@ export const getLatestPrice = async (ticker: string): Promise<Partial<PortfolioS
   try {
     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`);
     const json = await response.json();
+    
+    if (!json.chart || !json.chart.result) return null;
+    
     const result = json.chart.result[0];
     const meta = result.meta;
     const currentPrice = meta.regularMarketPrice;
