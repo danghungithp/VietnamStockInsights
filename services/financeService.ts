@@ -15,17 +15,21 @@ export const getYahooHistoricalData = async (ticker: string, range: string = "3m
     const result = json.chart.result[0];
     const timestamps = result.timestamp;
     const quotes = result.indicators.quote[0];
-    const prices = quotes.close;
-    const volumes = quotes.volume;
+    
+    const { open, high, low, close: prices, volume: volumes } = quotes;
 
     return timestamps.map((ts: number, i: number) => {
       const date = new Date(ts * 1000);
       return {
         date: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         price: Math.round(prices[i]),
+        open: Math.round(open[i]),
+        high: Math.round(high[i]),
+        low: Math.round(low[i]),
+        close: Math.round(prices[i]),
         volume: volumes[i] || 0
       };
-    }).filter((item: any) => item.price !== null);
+    }).filter((item: any) => item.price !== null && item.open !== null);
   } catch (error) {
     console.error("Yahoo Finance Fetch Error:", error);
     return [];

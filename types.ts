@@ -61,7 +61,11 @@ export interface AnalysisResult {
 
 export interface ChartDataPoint {
   date: string;
-  price: number;
+  price: number; // Close price for compatibility
+  open: number;
+  high: number;
+  low: number;
+  close: number;
   volume: number;
 }
 

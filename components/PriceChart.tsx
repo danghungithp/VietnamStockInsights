@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ComposedChart, 
-  Area, 
   Bar, 
   Line,
   XAxis, 
@@ -12,7 +11,6 @@ import {
   ResponsiveContainer, 
   Scatter,
   Cell,
-  LabelList,
   Legend
 } from 'recharts';
 import { ChartDataPoint } from '../types';
@@ -26,7 +24,7 @@ const calculateSMA = (data: ChartDataPoint[], period: number) => {
   return data.map((val, index) => {
     if (index < period - 1) return null;
     const slice = data.slice(index - period + 1, index + 1);
-    const sum = slice.reduce((acc, curr) => acc + curr.price, 0);
+    const sum = slice.reduce((acc, curr) => acc + curr.close, 0);
     return Math.round(sum / period);
   });
 };
@@ -36,10 +34,10 @@ const calculateEMA = (data: ChartDataPoint[], period: number) => {
   let prevEMA: number | null = null;
   return data.map((val, index) => {
     if (index === 0) {
-      prevEMA = val.price;
-      return val.price;
+      prevEMA = val.close;
+      return val.close;
     }
-    const currentEMA = val.price * k + (prevEMA as number) * (1 - k);
+    const currentEMA = val.close * k + (prevEMA as number) * (1 - k);
     prevEMA = currentEMA;
     return Math.round(currentEMA);
   });
@@ -51,7 +49,7 @@ const calculateRSI = (data: ChartDataPoint[], period: number = 14) => {
   let losses = 0;
 
   for (let i = 1; i < data.length; i++) {
-    const diff = data[i].price - data[i - 1].price;
+    const diff = data[i].close - data[i - 1].close;
     if (i <= period) {
       if (diff > 0) gains += diff;
       else losses -= diff;
@@ -98,6 +96,46 @@ const SignalShape = (props: any) => {
   );
 };
 
+// Custom Candlestick Shape
+const Candlestick = (props: any) => {
+  const {
+    x, y, width, height, open, close, high, low,
+  } = props;
+
+  const isUp = close >= open;
+  const color = isUp ? '#10b981' : '#f43f5e';
+
+  // The bar represents the body (open/close)
+  // Recharts provides x, y, width, height for the bar based on the [open, close] array
+  // We need to calculate the ratio to place the whiskers (high/low)
+  const ratio = Math.abs(open - close) === 0 ? 1 : height / Math.abs(open - close);
+  const highY = y - Math.abs(high - Math.max(open, close)) * ratio;
+  const lowY = y + height + Math.abs(Math.min(open, close) - low) * ratio;
+  const centerX = x + width / 2;
+
+  return (
+    <g>
+      {/* Wick (High-Low Line) */}
+      <line 
+        x1={centerX} 
+        y1={highY} 
+        x2={centerX} 
+        y2={lowY} 
+        stroke={color} 
+        strokeWidth={1.5} 
+      />
+      {/* Body (Open-Close Rect) */}
+      <rect 
+        x={x} 
+        y={y} 
+        width={width} 
+        height={Math.max(height, 1)} 
+        fill={color} 
+      />
+    </g>
+  );
+};
+
 const PriceChart: React.FC<Props> = ({ ticker }) => {
   const [rawData, setRawData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +145,6 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
   const [showEMA, setShowEMA] = useState(false);
   const [showRSI, setShowRSI] = useState(true);
   const [showSignals, setShowSignals] = useState(true);
-  const [volumeType, setVolumeType] = useState<'bar' | 'area'>('bar');
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
@@ -149,8 +186,6 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         } else if (currentRSI > 70 && lastSignalType !== 'SELL') {
           buySell = 'SELL';
           lastSignalType = 'SELL';
-        } else if (currentRSI >= 30 && currentRSI <= 70) {
-          // Keep the status to avoid multiple signals in the same zone
         }
       }
 
@@ -159,9 +194,11 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         sma: sma[i],
         ema: ema[i],
         rsi: currentRSI ? Math.round(currentRSI) : null,
-        signal: buySell ? d.price : null,
+        signal: buySell ? d.close : null,
         signalType: buySell,
-        signalLabel: buySell === 'BUY' ? 'M' : buySell === 'SELL' ? 'B' : null
+        signalLabel: buySell === 'BUY' ? 'M' : buySell === 'SELL' ? 'B' : null,
+        // Range for the Bar body
+        candle: [d.open, d.close]
       };
     });
   }, [rawData, showSignals]);
@@ -173,12 +210,9 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
       .slice(0, 3);
   }, [processedData]);
 
-  const formatVolume = (value: number) => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    return `${(value / 1000).toFixed(0)}K`;
-  };
-
   if (loading) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center animate-pulse"><span className="text-slate-500">Đang tải biểu đồ kỹ thuật...</span></div>;
+
+  if (error) return <div className="glass p-6 rounded-2xl h-[450px] flex items-center justify-center"><span className="text-rose-400">Không thể tải dữ liệu biểu đồ.</span></div>;
 
   return (
     <div className="space-y-4">
@@ -186,14 +220,14 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <i className="fa-solid fa-chart-area text-blue-500"></i>
-              Biểu đồ kĩ thuật {ticker}
+              <i className="fa-solid fa-chart-line text-blue-500"></i>
+              Biểu đồ nến {ticker}
             </h3>
             <button 
               onClick={() => setShowGuide(!showGuide)}
               className="text-[10px] text-blue-400 font-bold hover:underline mt-1"
             >
-              <i className="fa-solid fa-circle-info mr-1"></i> Cách đọc tín hiệu?
+              <i className="fa-solid fa-circle-info mr-1"></i> Cách đọc biểu đồ nến?
             </button>
           </div>
           
@@ -211,22 +245,17 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
                 </button>
               );
             })}
-            <button 
-              onClick={() => setVolumeType(volumeType === 'bar' ? 'area' : 'bar')}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
-            >
-              <i className={`fa-solid ${volumeType === 'bar' ? 'fa-chart-simple' : 'fa-chart-area'}`}></i>
-            </button>
           </div>
         </div>
 
         {showGuide && (
           <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-slate-300 leading-relaxed animate-in fade-in slide-in-from-top-2">
-            <p className="mb-2 font-bold text-blue-400 uppercase tracking-wider">Chiến lược sử dụng:</p>
+            <p className="mb-2 font-bold text-blue-400 uppercase tracking-wider">Hướng dẫn:</p>
             <ul className="list-disc pl-4 space-y-1">
-              <li><strong className="text-emerald-400">Tín hiệu M (Mua):</strong> RSI giảm xuống dưới 30 (Vùng quá bán), kỳ vọng giá phục hồi.</li>
-              <li><strong className="text-rose-400">Tín hiệu B (Bán):</strong> RSI vượt lên trên 70 (Vùng quá mua), cảnh báo giá sắp điều chỉnh.</li>
-              <li><strong className="text-orange-400">SMA/EMA:</strong> Sử dụng làm đường hỗ trợ/kháng cự động. Giá vượt lên trên là xu hướng tăng.</li>
+              <li><strong className="text-emerald-400">Nến xanh:</strong> Giá đóng cửa cao hơn mở cửa (Tăng).</li>
+              <li><strong className="text-rose-400">Nến đỏ:</strong> Giá đóng cửa thấp hơn mở cửa (Giảm).</li>
+              <li><strong className="text-slate-200">Bóng nến:</strong> Đường thẳng mảnh thể hiện giá cao nhất và thấp nhất trong ngày.</li>
+              <li><strong className="text-blue-400">SMA/EMA:</strong> Đường trung bình giúp xác định xu hướng dài hạn và ngắn hạn.</li>
             </ul>
           </div>
         )}
@@ -234,32 +263,40 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         <div className="h-[350px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={processedData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
               <XAxis dataKey="date" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="price" stroke="#3b82f6" fontSize={10} tickLine={false} axisLine={false} domain={['auto', 'auto']} tickFormatter={(val) => val.toLocaleString('vi-VN')} />
+              <YAxis 
+                yAxisId="price" 
+                stroke="#3b82f6" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={false} 
+                domain={['auto', 'auto']} 
+                tickFormatter={(val) => val.toLocaleString('vi-VN')} 
+              />
               <YAxis yAxisId="volume" orientation="right" hide />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', fontSize: '11px' }}
-                formatter={(val: any) => val.toLocaleString('vi-VN')}
+                labelStyle={{ color: '#94a3b8', marginBottom: '4px', fontWeight: 'bold' }}
+                formatter={(value: any, name: string) => {
+                  if (Array.isArray(value)) return [`O: ${value[0].toLocaleString()} - C: ${value[1].toLocaleString()}`, 'OHLC'];
+                  return [value.toLocaleString('vi-VN'), name];
+                }}
               />
               <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
               
-              {volumeType === 'bar' ? (
-                <Bar yAxisId="volume" dataKey="volume" fill="#1e293b" opacity={0.3} name="Khối lượng" />
-              ) : (
-                <Area yAxisId="volume" type="monotone" dataKey="volume" fill="#1e293b" stroke="none" opacity={0.2} name="Khối lượng" />
-              )}
+              <Bar yAxisId="volume" dataKey="volume" fill="#1e293b" opacity={0.2} name="Khối lượng" />
 
-              <Area yAxisId="price" type="monotone" dataKey="price" stroke="#3b82f6" fill="url(#colorPrice)" strokeWidth={2} dot={false} name="Giá" />
+              {/* Candlestick Body and Wicks */}
+              <Bar 
+                yAxisId="price" 
+                dataKey="candle" 
+                shape={<Candlestick />} 
+                name="Giá" 
+              />
               
-              {showSMA && <Line yAxisId="price" type="monotone" dataKey="sma" stroke="#f59e0b" strokeWidth={1} dot={false} name="SMA 20" />}
-              {showEMA && <Line yAxisId="price" type="monotone" dataKey="ema" stroke="#a855f7" strokeWidth={1} dot={false} name="EMA 10" />}
+              {showSMA && <Line yAxisId="price" type="monotone" dataKey="sma" stroke="#f59e0b" strokeWidth={1.5} dot={false} name="SMA 20" />}
+              {showEMA && <Line yAxisId="price" type="monotone" dataKey="ema" stroke="#a855f7" strokeWidth={1.5} dot={false} name="EMA 10" />}
               
               {showSignals && (
                 <Scatter yAxisId="price" dataKey="signal" shape={<SignalShape />} name="Tín hiệu M/B">
@@ -286,7 +323,6 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
           </div>
         )}
 
-        {/* Tín hiệu gần nhất */}
         <div className="mt-6 pt-6 border-t border-slate-800">
           <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Tín hiệu kỹ thuật gần đây</h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -299,7 +335,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
                   <div className="text-[10px] text-slate-500 font-medium">{sig.date}</div>
                 </div>
                 <div className="text-xs font-bold text-white">
-                  {sig.price.toLocaleString('vi-VN')}
+                  {sig.close.toLocaleString('vi-VN')}
                 </div>
               </div>
             )) : (
