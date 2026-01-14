@@ -58,7 +58,6 @@
 }
 </script>
     <script>
-        // Bắt lỗi tải script (CORS hoặc mạng chậm)
         window.onerror = function(msg, url, line, col, error) {
             const loader = document.getElementById('app-loader');
             if (loader) {
@@ -66,32 +65,28 @@
                     <div style="padding: 20px; text-align: center; max-width: 400px;">
                         <i class="fa-solid fa-triangle-exclamation" style="color: #f43f5e; font-size: 40px; margin-bottom: 20px;"></i>
                         <h2 style="color: #fff; margin-bottom: 10px;">Lỗi tải ứng dụng</h2>
-                        <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Trình duyệt không thể tải mã nguồn từ máy chủ thư viện (esm.sh). Điều này thường do mạng chậm hoặc bị chặn bởi phần mềm bảo mật.</p>
-                        <button onclick="window.location.reload()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Thử tải lại trang</button>
+                        <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Trình duyệt không thể tải mã nguồn. Vui lòng kiểm tra kết nối Internet hoặc thử tắt VPN.</p>
+                        <button onclick="window.location.reload()" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Thử tải lại</button>
                     </div>
                 `;
             }
             return false;
         };
-
-        // Hiện thông báo nếu tải quá lâu (15 giây)
         setTimeout(() => {
             const timeoutMsg = document.getElementById('timeout-msg');
             if (timeoutMsg && document.getElementById('app-loader')) {
                 timeoutMsg.style.display = 'block';
             }
-        }, 15000);
+        }, 12000);
     </script>
 </head>
 <body>
     <div id="app-loader">
         <div style="width: 40px; height: 40px; border: 3px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
         <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
-        <p style="margin-top: 16px; color: #94a3b8; font-size: 14px; font-weight: 500;">Đang kết nối hệ thống AI...</p>
-        
+        <p style="margin-top: 16px; color: #94a3b8; font-size: 14px; font-weight: 500;">Đang khởi tạo hệ thống...</p>
         <div id="timeout-msg">
-            <p style="color: #f43f5e; font-size: 12px; font-weight: bold; margin-bottom: 8px;">TẢI QUÁ LÂU?</p>
-            <p style="color: #94a3b8; font-size: 11px; line-height: 1.5;">Có vẻ mạng của bạn đang bị chậm hoặc trình duyệt chặn script từ <b>esm.sh</b>. Hãy thử tắt các tiện ích AdBlock hoặc đổi DNS sang 8.8.8.8.</p>
+            <p style="color: #94a3b8; font-size: 11px; line-height: 1.5;">Đang tải thư viện từ <b>esm.sh</b>. Nếu bạn thấy màn hình này quá lâu, hãy thử tải lại trang.</p>
         </div>
     </div>
     <div id="root"></div>

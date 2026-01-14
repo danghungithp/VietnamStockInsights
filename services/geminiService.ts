@@ -2,14 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, GroundingLink, NewsItem, MarketIndex, MarketMover, SocialTrend } from "../types";
 
-// Hàm khởi tạo AI instance với khóa mới nhất từ process.env.API_KEY
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Kiểm tra và khởi tạo AI một cách an toàn
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API_KEY_MISSING");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getMarketOverview = async (): Promise<MarketIndex[]> => {
-  const ai = getAI();
-  const prompt = `Lấy giá trị hiện tại, điểm thay đổi và % thay đổi của các chỉ số chứng khoán Việt Nam sau: VN-INDEX, HNX-INDEX, UPCOM-INDEX, VN30. Trả về JSON array.`;
-
   try {
+    const ai = getAI();
+    const prompt = `Lấy giá trị hiện tại, điểm thay đổi và % thay đổi của các chỉ số chứng khoán Việt Nam sau: VN-INDEX, HNX-INDEX, UPCOM-INDEX, VN30. Trả về JSON array.`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -32,17 +38,18 @@ export const getMarketOverview = async (): Promise<MarketIndex[]> => {
       }
     });
     return JSON.parse(response.text || "[]");
-  } catch (error) {
-    console.error("Market Overview Error:", error);
+  } catch (error: any) {
+    console.warn("Market Overview failed:", error.message);
+    if (error.message === "API_KEY_MISSING") throw error;
     return [];
   }
 };
 
 export const getMarketMovers = async (): Promise<{ gainers: MarketMover[], losers: MarketMover[], active: MarketMover[] }> => {
-  const ai = getAI();
-  const prompt = `Tìm danh sách các cổ phiếu biến động mạnh nhất hôm nay tại VN: top tăng giá, top giảm giá và top giao dịch nhiều nhất. Trả về JSON object { gainers: [], losers: [], active: [] }.`;
-
   try {
+    const ai = getAI();
+    const prompt = `Tìm danh sách các cổ phiếu biến động mạnh nhất hôm nay tại VN: top tăng giá, top giảm giá và top giao dịch nhiều nhất. Trả về JSON object { gainers: [], losers: [], active: [] }.`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -61,20 +68,16 @@ export const getMarketMovers = async (): Promise<{ gainers: MarketMover[], loser
     });
     return JSON.parse(response.text || '{"gainers":[],"losers":[],"active":[]}');
   } catch (error: any) {
-    if (error.message?.includes("Requested entity was not found")) {
-      console.warn("API Key might be invalid or project not found.");
-    }
+    console.warn("Market Movers failed");
     return { gainers: [], losers: [], active: [] };
   }
 };
 
 export const getSocialTrends = async (): Promise<SocialTrend[]> => {
-  const ai = getAI();
-  const prompt = `Phân tích các hội nhóm Facebook chứng khoán, Zalo, TikTok và diễn đàn F319 để tìm ra 5 mã cổ phiếu đang được cộng đồng quan tâm nhất hiện nay tại Việt Nam. 
-  Đánh giá điểm tâm lý (0-100), số lượng nhắc tới và lý do tại sao nó đang "hot". 
-  Trả về JSON array.`;
-
   try {
+    const ai = getAI();
+    const prompt = `Phân tích tâm lý cộng đồng đầu tư chứng khoán Việt Nam hôm nay. Tìm 5 mã đang được nhắc tới nhiều nhất. Trả về JSON array.`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -110,7 +113,7 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview", // Use Pro for deep analysis
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -178,9 +181,9 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
 };
 
 export const searchStockNews = async (ticker: string, query: string): Promise<NewsItem[]> => {
-  const ai = getAI();
-  const prompt = `Tìm tin tức về mã ${ticker} liên quan đến: "${query}". Trả về JSON array.`;
   try {
+    const ai = getAI();
+    const prompt = `Tìm tin tức về mã ${ticker} liên quan đến: "${query}". Trả về JSON array.`;
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
