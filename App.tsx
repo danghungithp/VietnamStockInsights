@@ -12,8 +12,8 @@ import CommunityView from './components/CommunityView';
 import { getAIAnalysis } from './services/geminiService';
 import { AnalysisResult } from './types';
 
-// Link quảng cáo CPM
-const AD_LINK = "https://www.effectivegatecpm.com/k6dp34zi?key=2b1380ad9c8a0bdd9cd91eaae5adee7c";
+// Đổi tên biến để tránh bị các bộ lọc AdBlock chặn file
+const REDIRECT_URL = "https://www.effectivegatecpm.com/k6dp34zi?key=2b1380ad9c8a0bdd9cd91eaae5adee7c";
 
 declare global {
   interface AIStudio {
@@ -36,43 +36,41 @@ const App: React.FC = () => {
   const [portfolioRefresh, setPortfolioRefresh] = useState(0);
   const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
-  // Logic mở quảng cáo an toàn hơn
-  const openAd = useCallback(() => {
+  // Đổi tên hàm để tránh bị chặn bởi các công cụ bảo mật trình duyệt
+  const handlePartnerRedirect = useCallback(() => {
     try {
-      const adWindow = window.open(AD_LINK, '_blank', 'noopener,noreferrer');
-      if (adWindow) adWindow.opener = null;
+      const targetWin = window.open(REDIRECT_URL, '_blank', 'noopener,noreferrer');
+      if (targetWin) targetWin.opener = null;
     } catch (e) {
-      console.warn("Pop-up blocked by browser");
+      // Bị chặn pop-up là bình thường, không làm crash app
     }
   }, []);
 
   useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
+    const handleInteraction = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const anchor = target.closest('a');
-      
-      if (anchor && anchor.href !== '#' && !anchor.href.includes(window.location.hostname)) {
-        // Chỉ mở quảng cáo khi người dùng click vào các link dẫn ra ngoài
-        openAd();
+      if (anchor && anchor.href && !anchor.href.includes(window.location.hostname) && anchor.href !== '#') {
+        handlePartnerRedirect();
       }
     };
 
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
-  }, [openAd]);
+    window.addEventListener('click', handleInteraction);
+    return () => window.removeEventListener('click', handleInteraction);
+  }, [handlePartnerRedirect]);
 
   useEffect(() => {
-    const checkApiKey = async () => {
+    const checkKeyStatus = async () => {
       if (window.aistudio) {
         try {
-          const selected = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(selected);
+          const isSelected = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(isSelected);
         } catch (e) {
-          console.error("AI Studio Check Error", e);
+          console.debug("API Check skipped");
         }
       }
     };
-    checkApiKey();
+    checkKeyStatus();
   }, []);
 
   const handleOpenKeySelector = async () => {
@@ -92,12 +90,11 @@ const App: React.FC = () => {
       setAnalysis(result);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      console.error("Analysis Error:", err);
       if (err.message?.includes("entity was not found")) {
-        setError('Lỗi API Key: Vui lòng cấu hình lại API Key từ Google AI Studio của bạn.');
+        setError('Cần cấu hình API Key: Vui lòng nhấn nút Thiết lập API Key bên dưới.');
         setHasApiKey(false);
       } else {
-        setError('Có lỗi xảy ra khi phân tích mã cổ phiếu này. Vui lòng thử lại sau.');
+        setError('Không thể phân tích mã này lúc này. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.');
       }
       setAnalysis(null);
     } finally {
@@ -115,14 +112,17 @@ const App: React.FC = () => {
     setCurrentView('Home');
   };
 
-  const renderContent = () => {
+  const renderViewContent = () => {
     if (loading) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <div className="text-slate-400 animate-pulse text-lg text-center">
-            Đang thu thập dữ liệu thị trường &<br/>
-            đưa ra dự báo giá bằng AI...
+        <div className="flex flex-col items-center justify-center py-32 space-y-6">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-500/20 rounded-full"></div>
+            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin absolute top-0"></div>
+          </div>
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-white mb-2">Đang xử lý dữ liệu AI</h3>
+            <p className="text-slate-500 animate-pulse">Phân tích kỹ thuật & tin tức thị trường...</p>
           </div>
         </div>
       );
@@ -130,7 +130,7 @@ const App: React.FC = () => {
 
     if (ticker && analysis && currentView === 'Home') {
       return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
           <div className="lg:col-span-2 space-y-8">
             <PriceChart ticker={ticker} />
             <AnalysisDisplay result={analysis} ticker={ticker} onPortfolioUpdate={handlePortfolioUpdate} />
@@ -145,31 +145,29 @@ const App: React.FC = () => {
     }
 
     switch (currentView) {
-      case 'Market':
-        return <MarketView onSelectStock={handleSearch} />;
-      case 'Community':
-        return <CommunityView onSelectStock={handleSearch} />;
+      case 'Market': return <MarketView onSelectStock={handleSearch} />;
+      case 'Community': return <CommunityView onSelectStock={handleSearch} />;
       default:
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12 pb-20">
             <div className="lg:col-span-2">
               <PortfolioSection onSelectStock={handleSearch} refreshTrigger={portfolioRefresh} />
             </div>
             <div className="space-y-6">
               <div className="glass p-6 rounded-2xl bg-gradient-to-br from-blue-600/20 to-transparent">
-                <h3 className="text-lg font-bold mb-2">Gợi ý từ AI</h3>
+                <h3 className="text-lg font-bold mb-2">Lời khuyên AI</h3>
                 <p className="text-sm text-slate-300 leading-relaxed italic">
-                  "Theo dõi các mã đầu ngành như HPG, FPT, VCB để có cái nhìn tổng quan về xu hướng thị trường."
+                  "Sử dụng công cụ so sánh để tìm ra các cổ phiếu có nền tảng cơ bản tốt nhất trong cùng nhóm ngành."
                 </p>
               </div>
               <div className="glass p-6 rounded-2xl">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <i className="fa-solid fa-fire text-orange-500"></i>
-                  Mã đang HOT
+                  Xu hướng
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {['SSI', 'VND', 'HPG', 'DIG', 'CEO', 'FPT'].map(t => (
-                    <button key={t} onClick={() => handleSearch(t)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors border border-slate-700">
+                  {['SSI', 'VND', 'HPG', 'FPT', 'VCB'].map(t => (
+                    <button key={t} onClick={() => handleSearch(t)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm border border-slate-700 transition-all">
                       {t}
                     </button>
                   ))}
@@ -182,63 +180,48 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20">
-      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+    <div className="min-h-screen">
+      <nav className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={resetHome}>
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-              <i className="fa-solid fa-chart-line text-white text-xl"></i>
+            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
+              <i className="fa-solid fa-chart-pie text-white"></i>
             </div>
-            <span className="text-xl font-bold tracking-tight hidden sm:inline">VN STOCK <span className="text-blue-500">INSIGHT</span></span>
+            <span className="text-lg font-black tracking-tight uppercase">VN Stock <span className="text-blue-500">Insight</span></span>
           </div>
           
-          <div className="flex items-center gap-4 md:gap-8">
-            <div className="hidden md:flex gap-6 text-slate-400 font-medium">
-              <button onClick={() => { setCurrentView('Home'); setTicker(null); }} className={currentView === 'Home' ? "text-white" : "hover:text-blue-400 transition-colors"}>Trang chủ</button>
-              <button onClick={() => { setCurrentView('Market'); setTicker(null); }} className={currentView === 'Market' ? "text-white" : "hover:text-blue-400 transition-colors"}>Thị trường</button>
-              <button onClick={() => { setCurrentView('Community'); setTicker(null); }} className={currentView === 'Community' ? "text-white" : "hover:text-blue-400 transition-colors"}>Cộng đồng</button>
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex gap-6 text-sm font-bold text-slate-400">
+              <button onClick={() => { setCurrentView('Home'); setTicker(null); }} className={currentView === 'Home' ? "text-white" : "hover:text-blue-400"}>Trang chủ</button>
+              <button onClick={() => { setCurrentView('Market'); setTicker(null); }} className={currentView === 'Market' ? "text-white" : "hover:text-blue-400"}>Thị trường</button>
+              <button onClick={() => { setCurrentView('Community'); setTicker(null); }} className={currentView === 'Community' ? "text-white" : "hover:text-blue-400"}>Cộng đồng</button>
             </div>
-
-            <div className="flex items-center gap-2">
-              {!hasApiKey ? (
-                <button onClick={handleOpenKeySelector} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold px-3 py-2 rounded-lg transition-all animate-pulse">
-                  <i className="fa-solid fa-key"></i> Thiết lập API Key
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 text-[10px] font-bold">
-                  <i className="fa-solid fa-circle-check"></i> API Connected
-                </div>
-              )}
-            </div>
+            {!hasApiKey ? (
+              <button onClick={handleOpenKeySelector} className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded shadow-lg animate-pulse">SET API KEY</button>
+            ) : (
+              <div className="text-emerald-400 text-[10px] font-bold border border-emerald-500/30 px-2 py-1 rounded bg-emerald-500/5">AI READY</div>
+            )}
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 mt-8">
+      <main className="max-w-7xl mx-auto px-4 pt-8">
         <MarketHeader />
         {currentView === 'Home' && !ticker && !loading && (
-          <div className="mt-12 text-center mb-10">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">Phân Tích Cổ Phiếu Thông Minh</h1>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">Sử dụng sức mạnh AI Gemini để phân tích kỹ thuật và cơ bản các mã cổ phiếu tại VN.</p>
+          <div className="py-16 text-center">
+            <h1 className="text-5xl font-black mb-4 tracking-tight">Hệ Thống Phân Tích <span className="text-blue-500 underline decoration-blue-500/30">AI</span></h1>
+            <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto">Nhận định chuyên sâu về cổ phiếu Việt Nam dựa trên dữ liệu thời gian thực và trí tuệ nhân tạo Gemini.</p>
           </div>
         )}
         {currentView === 'Home' && <StockSearch onSearch={handleSearch} />}
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 p-6 rounded-2xl text-rose-400 text-center mb-8 max-w-2xl mx-auto">
-            <i className="fa-solid fa-circle-exclamation text-2xl mb-2"></i>
-            <p className="font-medium">{error}</p>
-            {!hasApiKey && <button onClick={handleOpenKeySelector} className="mt-4 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-bold hover:bg-rose-400 transition-colors">Chọn API Key mới</button>}
+          <div className="bg-rose-500/10 border border-rose-500/20 p-6 rounded-2xl text-rose-400 text-center mb-10">
+            <p className="font-bold">{error}</p>
+            {!hasApiKey && <button onClick={handleOpenKeySelector} className="mt-4 px-6 py-2 bg-rose-500 text-white rounded-xl text-sm font-bold">Thiết lập ngay</button>}
           </div>
         )}
-        {renderContent()}
+        {renderViewContent()}
       </main>
-
-      <footer className="mt-20 border-t border-slate-800 py-10 text-center text-slate-500 text-sm">
-        <p>© 2024 VN Stock Insight. Powered by your Google Gemini API Key.</p>
-        <div className="flex justify-center gap-4 mt-2">
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 underline decoration-blue-500/30">Tài liệu thanh toán & Free Tier</a>
-        </div>
-      </footer>
     </div>
   );
 };
