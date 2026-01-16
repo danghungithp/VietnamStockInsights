@@ -1,7 +1,7 @@
 
 import { ChartDataPoint, PortfolioStock } from "../types";
 
-// Sử dụng AllOrigins để có độ ổn định cao hơn khi deploy lên Vercel
+// Sử dụng AllOrigins với logic xử lý response an toàn hơn
 const CORS_PROXY = "https://api.allorigins.win/raw?url=";
 
 export const getYahooHistoricalData = async (ticker: string, range: string = "3mo"): Promise<ChartDataPoint[]> => {
@@ -10,12 +10,15 @@ export const getYahooHistoricalData = async (ticker: string, range: string = "3m
 
   try {
     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`);
-    if (!response.ok) throw new Error("Proxy error");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Proxy error: ${response.status} ${errorText}`);
+    }
     
     const json = await response.json();
     
-    if (!json.chart || !json.chart.result) {
-      console.error("Yahoo API Error:", json);
+    if (!json || !json.chart || !json.chart.result) {
+      console.warn("Yahoo API Empty Result for", symbol, json);
       return [];
     }
 
@@ -29,9 +32,10 @@ export const getYahooHistoricalData = async (ticker: string, range: string = "3m
     const { open, high, low, volume: volumes } = quotes;
 
     return timestamps.map((ts: number, i: number) => {
-      const date = new Date(ts * 1000);
       const closePrice = adjClose[i] || quotes.close[i];
-      
+      if (closePrice === null || closePrice === undefined) return null;
+
+      const date = new Date(ts * 1000);
       return {
         date: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         price: Math.round(closePrice),
@@ -41,7 +45,7 @@ export const getYahooHistoricalData = async (ticker: string, range: string = "3m
         close: Math.round(closePrice),
         volume: volumes[i] || 0
       };
-    }).filter((item: any) => item.price !== null && item.open !== null);
+    }).filter((item: any) => item !== null);
   } catch (error) {
     console.error("Yahoo Finance Fetch Error:", error);
     return [];
@@ -54,12 +58,15 @@ export const getLatestPrice = async (ticker: string): Promise<Partial<PortfolioS
 
   try {
     const response = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`);
-    const json = await response.json();
+    if (!response.ok) return null;
     
-    if (!json.chart || !json.chart.result) return null;
+    const json = await response.json();
+    if (!json || !json.chart || !json.chart.result) return null;
     
     const result = json.chart.result[0];
     const meta = result.meta;
+    if (!meta) return null;
+
     const currentPrice = meta.regularMarketPrice;
     const prevClose = meta.previousClose;
     const change = currentPrice - prevClose;
@@ -67,11 +74,12 @@ export const getLatestPrice = async (ticker: string): Promise<Partial<PortfolioS
 
     return {
       ticker,
-      currentPrice,
+      currentPrice: Math.round(currentPrice),
       change: Number(change.toFixed(2)),
       changePercent: Number(changePercent.toFixed(2))
     };
   } catch (error) {
+    console.error("Latest Price Error:", error);
     return null;
   }
 };

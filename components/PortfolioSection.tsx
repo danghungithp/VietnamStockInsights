@@ -8,6 +8,8 @@ interface Props {
   refreshTrigger: number;
 }
 
+const AD_LINK = "https://www.effectivegatecpm.com/fysmnc3w?key=e666bce09744cbb36c6891155e9a3662";
+
 const PortfolioSection: React.FC<Props> = ({ onSelectStock, refreshTrigger }) => {
   const [portfolio, setPortfolio] = useState<PortfolioStock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,11 @@ const PortfolioSection: React.FC<Props> = ({ onSelectStock, refreshTrigger }) =>
   useEffect(() => {
     loadPortfolio();
   }, [refreshTrigger]);
+
+  const handleSelect = (ticker: string) => {
+    window.open(AD_LINK, '_blank');
+    onSelectStock(ticker);
+  };
 
   const removeFromPortfolio = (e: React.MouseEvent, ticker: string) => {
     e.stopPropagation();
@@ -84,7 +91,7 @@ const PortfolioSection: React.FC<Props> = ({ onSelectStock, refreshTrigger }) =>
         {portfolio.map((stock) => (
           <div 
             key={stock.ticker}
-            onClick={() => onSelectStock(stock.ticker)}
+            onClick={() => handleSelect(stock.ticker)}
             className="group flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-700/40 rounded-xl border border-slate-700/30 transition-all cursor-pointer"
           >
             <div className="flex items-center gap-4">

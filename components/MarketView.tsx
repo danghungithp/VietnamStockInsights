@@ -7,6 +7,8 @@ interface Props {
   onSelectStock: (ticker: string) => void;
 }
 
+const AD_LINK = "https://www.effectivegatecpm.com/fysmnc3w?key=e666bce09744cbb36c6891155e9a3662";
+
 const MarketView: React.FC<Props> = ({ onSelectStock }) => {
   const [data, setData] = useState<{ gainers: MarketMover[], losers: MarketMover[], active: MarketMover[] }>({ gainers: [], losers: [], active: [] });
   const [loading, setLoading] = useState(true);
@@ -14,12 +16,22 @@ const MarketView: React.FC<Props> = ({ onSelectStock }) => {
   useEffect(() => {
     const fetchMovers = async () => {
       setLoading(true);
-      const res = await getMarketMovers();
-      setData(res);
-      setLoading(false);
+      try {
+        const res = await getMarketMovers();
+        setData(res);
+      } catch (e) {
+        console.error("Market Movers error:", e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchMovers();
   }, []);
+
+  const handleSelect = (ticker: string) => {
+    window.open(AD_LINK, '_blank');
+    onSelectStock(ticker);
+  };
 
   if (loading) {
     return (
@@ -36,10 +48,10 @@ const MarketView: React.FC<Props> = ({ onSelectStock }) => {
         {title}
       </h3>
       <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
-        {list.map((m) => (
+        {(list || []).map((m) => (
           <div 
             key={m.ticker} 
-            onClick={() => onSelectStock(m.ticker)}
+            onClick={() => handleSelect(m.ticker)}
             className="flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-700/50 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-600"
           >
             <div>
@@ -47,13 +59,16 @@ const MarketView: React.FC<Props> = ({ onSelectStock }) => {
               <div className="text-[10px] text-slate-500 font-bold uppercase">{m.volume} cp</div>
             </div>
             <div className="text-right">
-              <div className="font-bold">{m.price.toLocaleString('vi-VN')}</div>
+              <div className="font-bold">{m.price?.toLocaleString('vi-VN') || '--'}</div>
               <div className={`text-xs font-black ${m.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {m.changePercent >= 0 ? '+' : ''}{m.changePercent}%
               </div>
             </div>
           </div>
         ))}
+        {(!list || list.length === 0) && (
+          <div className="text-center py-10 text-slate-500 text-xs italic">Không có dữ liệu</div>
+        )}
       </div>
     </div>
   );

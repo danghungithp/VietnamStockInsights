@@ -11,7 +11,7 @@ const MarketHeader: React.FC = () => {
     const fetchMarket = async () => {
       try {
         const data = await getMarketOverview();
-        if (data && data.length > 0) {
+        if (data && Array.isArray(data) && data.length > 0) {
           setIndices(data);
         }
       } catch (error) {
@@ -40,12 +40,14 @@ const MarketHeader: React.FC = () => {
     );
   }
 
+  const safeIndices = Array.isArray(indices) ? indices : [];
+
   return (
     <div className="flex flex-wrap gap-4 overflow-x-auto pb-4 no-scrollbar">
-      {(indices.length > 0 ? indices : []).map((idx) => (
+      {safeIndices.map((idx) => (
         <div key={idx.name} className="glass p-4 rounded-xl min-w-[200px] flex-1">
           <div className="text-slate-400 text-xs font-semibold mb-1 uppercase tracking-wider">{idx.name}</div>
-          <div className="text-xl font-bold mb-1">{idx.value.toLocaleString('vi-VN')}</div>
+          <div className="text-xl font-bold mb-1">{idx.value?.toLocaleString('vi-VN') || '--'}</div>
           <div className={`text-sm font-medium flex items-center gap-1 ${idx.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             <i className={`fa-solid ${idx.change >= 0 ? 'fa-caret-up' : 'fa-caret-down'}`}></i>
             <span>{idx.change >= 0 ? '+' : ''}{idx.change} ({idx.changePercent}%)</span>

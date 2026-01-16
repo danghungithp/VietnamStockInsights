@@ -89,7 +89,7 @@ const SignalShape = (props: any) => {
   return (
     <g>
       <circle cx={cx} cy={cy} r={12} fill={fill} fillOpacity={0.2} stroke={fill} strokeWidth={1} />
-      <text x={cx} y={cy + 4} textAnchor="middle" fill={fill} fontSize="10" fontWeight="bold">
+      <text x={cx} y={cy + 4} textAnchor="middle" fill={fill} fontSize="14" fontWeight="bold">
         {payload.signalLabel}
       </text>
     </g>
@@ -191,7 +191,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
         rsi: currentRSI ? Math.round(currentRSI) : null,
         signal: buySell ? d.close : null,
         signalType: buySell,
-        signalLabel: buySell === 'BUY' ? 'M' : buySell === 'SELL' ? 'B' : null,
+        signalLabel: buySell === 'BUY' ? '↑' : buySell === 'SELL' ? '↓' : null,
         candle: [d.open, d.close]
       };
     });
@@ -242,7 +242,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
           </div>
           
           <div className="flex flex-wrap gap-2">
-            {['SMA', 'EMA', 'RSI', 'M/B'].map((label) => {
+            {['SMA', 'EMA', 'RSI', 'Tín hiệu'].map((label) => {
               const isActive = label === 'SMA' ? showSMA : label === 'EMA' ? showEMA : label === 'RSI' ? showRSI : showSignals;
               const setFunc = label === 'SMA' ? setShowSMA : label === 'EMA' ? setShowEMA : label === 'RSI' ? setShowRSI : setShowSignals;
               return (
@@ -262,10 +262,10 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
           <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-slate-300 leading-relaxed animate-in fade-in slide-in-from-top-2">
             <p className="mb-2 font-bold text-blue-400 uppercase tracking-wider">Hướng dẫn:</p>
             <ul className="list-disc pl-4 space-y-1">
-              <li><strong className="text-emerald-400">Nến xanh:</strong> Giá đóng cửa cao hơn mở cửa (Tăng).</li>
-              <li><strong className="text-rose-400">Nến đỏ:</strong> Giá đóng cửa thấp hơn mở cửa (Giảm).</li>
-              <li><strong className="text-slate-200">Bóng nến:</strong> Đường thẳng mảnh thể hiện giá cao nhất và thấp nhất trong ngày.</li>
-              <li><strong className="text-blue-400">SMA/EMA:</strong> Đường trung bình giúp xác định xu hướng dài hạn và ngắn hạn.</li>
+              <li><strong className="text-emerald-400">↑:</strong> Tín hiệu Mua khi RSI đi vào vùng quá bán.</li>
+              <li><strong className="text-rose-400">↓:</strong> Tín hiệu Bán khi RSI đi vào vùng quá mua.</li>
+              <li><strong className="text-emerald-400">Nến xanh:</strong> Giá đóng cửa cao hơn mở cửa.</li>
+              <li><strong className="text-rose-400">Nến đỏ:</strong> Giá đóng cửa thấp hơn mở cửa.</li>
             </ul>
           </div>
         )}
@@ -308,7 +308,7 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
               {showEMA && <Line yAxisId="price" type="monotone" dataKey="ema" stroke="#a855f7" strokeWidth={1.5} dot={false} name="EMA 10" />}
               
               {showSignals && (
-                <Scatter yAxisId="price" dataKey="signal" shape={<SignalShape />} name="Tín hiệu M/B">
+                <Scatter yAxisId="price" dataKey="signal" shape={<SignalShape />} name="Tín hiệu ↑/↓">
                   {processedData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.signalType === 'BUY' ? '#10b981' : '#f43f5e'} />
                   ))}
@@ -338,8 +338,9 @@ const PriceChart: React.FC<Props> = ({ ticker }) => {
             {latestSignals.length > 0 ? latestSignals.map((sig, i) => (
               <div key={i} className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 flex items-center justify-between">
                 <div>
-                  <div className={`text-xs font-black ${sig.signalType === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {sig.signalType === 'BUY' ? 'MUA (RSI < 30)' : 'BÁN (RSI > 70)'}
+                  <div className={`text-xs font-black flex items-center gap-1 ${sig.signalType === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <span>{sig.signalType === 'BUY' ? '↑ MUA' : '↓ BÁN'}</span>
+                    <span className="text-[9px] opacity-60 font-normal">({sig.signalType === 'BUY' ? 'RSI < 30' : 'RSI > 70'})</span>
                   </div>
                   <div className="text-[10px] text-slate-500 font-medium">{sig.date}</div>
                 </div>

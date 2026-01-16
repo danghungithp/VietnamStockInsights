@@ -8,6 +8,8 @@ interface Props {
   onPortfolioUpdate?: () => void;
 }
 
+const AD_LINK = "https://www.effectivegatecpm.com/fysmnc3w?key=e666bce09744cbb36c6891155e9a3662";
+
 const RatioCard = ({ label, value, subtext }: { label: string, value: string | number | undefined, subtext?: string }) => (
   <div className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl flex flex-col items-center justify-center text-center">
     <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">{label}</span>
@@ -28,6 +30,9 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
   }, [ticker]);
 
   const togglePortfolio = () => {
+    // Mở quảng cáo khi tương tác quan trọng
+    window.open(AD_LINK, '_blank');
+    
     const saved = localStorage.getItem('vn_stock_portfolio');
     let tickers: string[] = saved ? JSON.parse(saved) : [];
     
@@ -42,12 +47,27 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
     if (onPortfolioUpdate) onPortfolioUpdate();
   };
 
+  const handleSourceClick = (e: React.MouseEvent, url: string) => {
+    e.preventDefault();
+    window.open(AD_LINK, '_blank');
+    window.open(url, '_blank');
+  };
+
   const getBadgeColor = (rec: string) => {
     switch (rec) {
       case 'BUY': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50';
       case 'SELL': return 'bg-rose-500/20 text-rose-400 border-rose-500/50';
       case 'HOLD': return 'bg-amber-500/20 text-amber-400 border-amber-500/50';
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/50';
+    }
+  };
+
+  const getRecIcon = (rec: string) => {
+    switch (rec) {
+      case 'BUY': return <i className="fa-solid fa-arrow-trend-up mr-2"></i>;
+      case 'SELL': return <i className="fa-solid fa-arrow-trend-down mr-2"></i>;
+      case 'HOLD': return <i className="fa-solid fa-circle mr-2 text-[10px]"></i>;
+      default: return null;
     }
   };
 
@@ -85,7 +105,8 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
             </div>
             <p className="text-slate-400 text-sm">Nhận định phân tích tổng hợp bởi Gemini AI</p>
           </div>
-          <div className={`px-6 py-3 rounded-xl border-2 font-black text-xl shadow-lg transition-transform hover:scale-105 ${getBadgeColor(result.recommendation)}`}>
+          <div className={`px-6 py-3 rounded-xl border-2 font-black text-xl shadow-lg transition-transform hover:scale-105 flex items-center ${getBadgeColor(result.recommendation)}`}>
+            {getRecIcon(result.recommendation)}
             {getRecText(result.recommendation)}
           </div>
         </div>
@@ -149,8 +170,7 @@ const AnalysisDisplay: React.FC<Props> = ({ result, ticker, onPortfolioUpdate })
               <a
                 key={idx}
                 href={source.uri}
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={(e) => handleSourceClick(e, source.uri)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 hover:bg-slate-700 rounded-lg text-xs text-blue-400 transition-all border border-slate-700/50 hover:border-blue-500/50"
               >
                 <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>

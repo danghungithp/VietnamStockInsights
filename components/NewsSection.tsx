@@ -8,6 +8,7 @@ interface Props {
   ticker: string;
 }
 
+const AD_LINK = "https://www.effectivegatecpm.com/fysmnc3w?key=e666bce09744cbb36c6891155e9a3662";
 const CATEGORIES = ['Tất cả', 'Kết quả kinh doanh', 'Cổ tức', 'Vĩ mô', 'Giao dịch', 'Tin chung'];
 
 const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
@@ -17,7 +18,6 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Update allNews when initialNews (from main analysis) changes
   useEffect(() => {
     setAllNews(initialNews);
     setSearchQuery('');
@@ -30,6 +30,12 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
     return allNews.filter(item => item.category === selectedCategory);
   }, [allNews, selectedCategory]);
 
+  const handleLinkClick = (e: React.MouseEvent, url: string) => {
+    e.preventDefault();
+    window.open(AD_LINK, '_blank');
+    window.open(url, '_blank');
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -39,7 +45,7 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
       const results = await searchStockNews(ticker, searchQuery);
       setAllNews(results);
       setHasSearched(true);
-      setSelectedCategory('Tất cả'); // Reset category filter on new search
+      setSelectedCategory('Tất cả');
     } catch (error) {
       console.error("Search failed", error);
     } finally {
@@ -80,7 +86,6 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
         )}
       </div>
 
-      {/* Mini Search Bar */}
       <form onSubmit={handleSearch} className="mb-4 relative">
         <input
           type="text"
@@ -102,7 +107,6 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
         </button>
       </form>
 
-      {/* Category Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
         {CATEGORIES.map(cat => (
           <button
@@ -130,8 +134,7 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
             <a 
               key={idx} 
               href={item.url} 
-              target="_blank" 
-              rel="noopener noreferrer" 
+              onClick={(e) => handleLinkClick(e, item.url)}
               className="group block border-b border-slate-700/30 pb-4 last:border-0 last:pb-0"
             >
               <div className="flex items-center gap-2 mb-2">
@@ -162,8 +165,7 @@ const NewsSection: React.FC<Props> = ({ news: initialNews, ticker }) => {
       <div className="mt-6 pt-4 border-t border-slate-700/50">
         <a 
           href={`https://cafef.vn/tim-kiem/${ticker}.chn`} 
-          target="_blank" 
-          rel="noopener noreferrer"
+          onClick={(e) => handleLinkClick(e, `https://cafef.vn/tim-kiem/${ticker}.chn`)}
           className="text-xs text-blue-500 hover:text-blue-400 flex items-center gap-1 font-medium transition-all group"
         >
           Xem chi tiết trên CafeF 

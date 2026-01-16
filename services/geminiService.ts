@@ -2,7 +2,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, GroundingLink, NewsItem, MarketIndex, MarketMover, SocialTrend } from "../types";
 
-// Kiểm tra và khởi tạo AI một cách an toàn
+// Hàm hỗ trợ parse JSON an toàn từ AI response
+const safeParseJSON = (text: string, fallback: any) => {
+  try {
+    // Loại bỏ markdown code blocks nếu có
+    const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("JSON Parse Error:", e, "Text:", text);
+    return fallback;
+  }
+};
+
 const getAI = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined") {
@@ -22,25 +33,12 @@ export const getMarketOverview = async (): Promise<MarketIndex[]> => {
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              value: { type: Type.NUMBER },
-              change: { type: Type.NUMBER },
-              changePercent: { type: Type.NUMBER }
-            },
-            required: ["name", "value", "change", "changePercent"]
-          }
-        }
       }
     });
-    return JSON.parse(response.text || "[]");
+    const data = safeParseJSON(response.text || "[]", []);
+    return Array.isArray(data) ? data : [];
   } catch (error: any) {
     console.warn("Market Overview failed:", error.message);
-    if (error.message === "API_KEY_MISSING") throw error;
     return [];
   }
 };
@@ -56,17 +54,14 @@ export const getMarketMovers = async (): Promise<{ gainers: MarketMover[], loser
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            gainers: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
-            losers: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
-            active: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { ticker: {type:Type.STRING}, price: {type:Type.NUMBER}, changePercent: {type:Type.NUMBER}, volume: {type:Type.STRING} } } },
-          }
-        }
       }
     });
-    return JSON.parse(response.text || '{"gainers":[],"losers":[],"active":[]}');
+    const data = safeParseJSON(response.text || "{}", { gainers: [], losers: [], active: [] });
+    return {
+      gainers: Array.isArray(data.gainers) ? data.gainers : [],
+      losers: Array.isArray(data.losers) ? data.losers : [],
+      active: Array.isArray(data.active) ? data.active : []
+    };
   } catch (error: any) {
     console.warn("Market Movers failed");
     return { gainers: [], losers: [], active: [] };
@@ -84,24 +79,10 @@ export const getSocialTrends = async (): Promise<SocialTrend[]> => {
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              ticker: { type: Type.STRING },
-              sentimentScore: { type: Type.NUMBER },
-              mentionCount: { type: Type.STRING },
-              platforms: { type: Type.ARRAY, items: { type: Type.STRING } },
-              status: { type: Type.STRING, enum: ['Hot', 'Rising', 'Alert'] },
-              reason: { type: Type.STRING }
-            },
-            required: ["ticker", "sentimentScore", "mentionCount", "platforms", "status", "reason"]
-          }
-        }
       }
     });
-    return JSON.parse(response.text || "[]");
+    const data = safeParseJSON(response.text || "[]", []);
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     return [];
   }
@@ -109,7 +90,7 @@ export const getSocialTrends = async (): Promise<SocialTrend[]> => {
 
 export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => {
   const ai = getAI();
-  const prompt = `Hãy phân tích mã cổ phiếu ${ticker} trên thị trường chứng khoán Việt Nam. Trả về kết quả JSON.`;
+  const prompt = `Hãy phân tích mã cổ phiếu ${ticker} trên thị trường chứng khoán Việt Nam. Cung cấp dữ liệu chi tiết về kỹ thuật, cơ bản và dự báo giá. Trả về kết quả JSON.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -118,54 +99,10 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
       config: {
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: { type: Type.STRING },
-            technicalAnalysis: { type: Type.STRING },
-            fundamentalAnalysis: { type: Type.STRING },
-            risks: { type: Type.STRING },
-            recommendation: { type: Type.STRING, enum: ['BUY', 'SELL', 'HOLD', 'NEUTRAL'] },
-            financialRatios: {
-              type: Type.OBJECT,
-              properties: {
-                pe: { type: Type.NUMBER },
-                eps: { type: Type.NUMBER },
-                roe: { type: Type.STRING },
-                pb: { type: Type.NUMBER },
-                dividendYield: { type: Type.STRING },
-                marketCap: { type: Type.STRING }
-              }
-            },
-            priceForecast: {
-              type: Type.OBJECT,
-              properties: {
-                targetPrice: { type: Type.NUMBER },
-                currentPrice: { type: Type.NUMBER },
-                timeframe: { type: Type.STRING },
-                confidence: { type: Type.STRING, enum: ['LOW', 'MEDIUM', 'HIGH'] },
-                reasoning: { type: Type.STRING }
-              }
-            },
-            news: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  source: { type: Type.STRING },
-                  url: { type: Type.STRING },
-                  time: { type: Type.STRING },
-                  category: { type: Type.STRING, enum: ['Kết quả kinh doanh', 'Cổ tức', 'Vĩ mô', 'Giao dịch', 'Tin chung'] }
-                }
-              }
-            }
-          }
-        }
       },
     });
 
-    const result = JSON.parse(response.text || "{}");
+    const result = safeParseJSON(response.text || "{}", {});
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const sources: GroundingLink[] = groundingChunks
       .filter((chunk: any) => chunk.web)
@@ -174,7 +111,13 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
         title: chunk.web.title || "Nguồn tin"
       }));
 
-    return { ...result, sources };
+    return { 
+      ...result, 
+      sources,
+      news: Array.isArray(result.news) ? result.news : [],
+      financialRatios: result.financialRatios || {},
+      priceForecast: result.priceForecast || { targetPrice: 0, currentPrice: 0, timeframe: "N/A", confidence: "LOW", reasoning: "N/A" }
+    };
   } catch (error) {
     throw error;
   }
@@ -183,7 +126,7 @@ export const getAIAnalysis = async (ticker: string): Promise<AnalysisResult> => 
 export const searchStockNews = async (ticker: string, query: string): Promise<NewsItem[]> => {
   try {
     const ai = getAI();
-    const prompt = `Tìm tin tức về mã ${ticker} liên quan đến: "${query}". Trả về JSON array.`;
+    const prompt = `Tìm tin tức mới nhất về mã ${ticker} liên quan đến: "${query}". Trả về JSON array các đối tượng NewsItem {title, source, url, time, category}.`;
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -192,7 +135,8 @@ export const searchStockNews = async (ticker: string, query: string): Promise<Ne
         responseMimeType: "application/json",
       },
     });
-    return JSON.parse(response.text || "[]");
+    const data = safeParseJSON(response.text || "[]", []);
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     return [];
   }
